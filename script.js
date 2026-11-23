@@ -10,24 +10,34 @@ async function fetchCountries() {
     loading.textContent = "Loading countries...";
     loading.style.display = "block";
     error.textContent = "";
+    countriesContainer.innerHTML = "";
 
     try {
         const response = await fetch(
-            "https://restcountries.com/v3.1/all?fields=name,flags,capital,population"
+            "https://api.worldbank.org/v2/country?format=json&per_page=300"
         );
 
         if (!response.ok) {
-            throw new Error("Failed to fetch country data");
+            throw new Error("API request failed");
         }
 
-        countriesData = await response.json();
+        const data = await response.json();
+
+        if (!data[1] || data[1].length === 0) {
+            throw new Error("No data available");
+        }
+
+        countriesData = data[1].filter(
+            country => country.region.value !== "Aggregates"
+        );
 
         loading.style.display = "none";
         displayCountries(countriesData);
 
     } catch (err) {
         loading.style.display = "none";
-        error.textContent = "Unable to load countries. Please try again.";
+        error.textContent =
+            "Unable to load countries. Please try again.";
     }
 }
 
@@ -43,25 +53,42 @@ function displayCountries(countries) {
         const card = document.createElement("div");
         card.className = "country-card";
 
-        card.innerHTML = `
-            <img src="${country.flags.png}" alt="Country flag">
-            <h2>${country.name.common}</h2>
-            <p>Capital: ${country.capital?.[0] || "N/A"}</p>
-            <p>Population: ${country.population.toLocaleString()}</p>
-        `;
+        const name = document.createElement("h2");
+        name.textContent = country.name;
 
+        const flag = document.createElement("h1");
+        const code = country.iso2Code;
+
+        flag.textContent = code
+            ? String.fromCodePoint(
+                ...[...code].map(
+                    char => 127397 + char.charCodeAt(0)
+                )
+              )
+            : "🌍";
+
+        const capital = document.createElement("p");
+        capital.textContent =
+            "Capital: " + (country.capitalCity || "N/A");
+
+        const region = document.createElement("p");
+        region.textContent =
+            "Region: " + country.region.value;
+
+        card.append(flag, name, capital, region);
         countriesContainer.appendChild(card);
     });
 }
 
 searchInput.addEventListener("input", () => {
-    const searchValue = searchInput.value.toLowerCase();
+    const value = searchInput.value.toLowerCase();
 
-    const filteredCountries = countriesData.filter(country =>
-        country.name.common.toLowerCase().includes(searchValue)
+    const filtered = countriesData.filter(country =>
+        country.name.toLowerCase().includes(value)
     );
 
-    displayCountries(filteredCountries);
+    displayCountries(filtered);
 });
 
 fetchCountries();
+
